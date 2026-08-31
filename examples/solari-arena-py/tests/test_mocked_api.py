@@ -138,13 +138,15 @@ def test_record_true_with_from_snapshot_is_400():
     assert err.status == 400
     assert err.code == "RecordingRequiresGoldenBoot"
 
+    prod = FakeSandboxClient()
+
     async def _prod():
-        host = await boot_original(sbx)
+        host = await boot_original(prod)
         snap = await host.handle.snapshot("after-setup")
-        return await release_then_fork(sbx, host, snap)
+        return await release_then_fork(prod, host, snap)
 
     asyncio.run(_prod())
-    forks = [c for c in sbx.calls if c[0] == "create_desktop" and c[1].get("from_snapshot")]
+    forks = [c for c in prod.calls if c[0] == "create_desktop" and c[1].get("from_snapshot")]
     assert forks
     for call in forks:
         assert "record" not in call[1]
