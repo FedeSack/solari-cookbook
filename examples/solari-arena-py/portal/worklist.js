@@ -57,7 +57,7 @@ function paint() {
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "#1b1f24";
   ctx.font = "16px sans-serif";
-  ctx.fillText("Pending claims (painted — not DOM)", 24, 40);
+  ctx.fillText("Pending claims (painted, not DOM)", 24, 40);
   ctx.font = "14px sans-serif";
   ctx.fillText(targetId + "   SYNTHETIC-A   $120.00   pending", 24, 88);
   ctx.fillText(sideId + "   SYNTHETIC-B   $88.50   pending", 24, 120);

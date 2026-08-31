@@ -1,4 +1,4 @@
-"""Oracle parser + dual-score — no API key."""
+"""Oracle parser + dual-score. No API key."""
 
 from __future__ import annotations
 

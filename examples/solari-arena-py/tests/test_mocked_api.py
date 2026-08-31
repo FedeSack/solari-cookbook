@@ -56,7 +56,8 @@ def test_run_live_refuses_under_pytest_even_with_a_key(monkeypatch, capsys):
     code = asyncio.run(run_live())
     assert code == 0
     out = capsys.readouterr().out
-    assert "refusing live Solari calls" in out
+    assert "inconclusive" in out
+    assert "live skipped under pytest" in out
     assert "slr_live_" not in out
 
 

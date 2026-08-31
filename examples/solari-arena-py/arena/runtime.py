@@ -1,6 +1,6 @@
 """VM lifecycle: host the portal, snapshot, fork under the Free 1-VM cap.
 
-DesktopClient.create() has no from_snapshot — forks go through
+DesktopClient.create() has no from_snapshot; forks go through
 SandboxClient.create_desktop(from_snapshot=...). record=True on that
 path is 400 RecordingRequiresGoldenBoot; record the golden boot or a
 browser replay instead.
@@ -65,18 +65,18 @@ async def _wait_preview(url: str, attempts: int = 20) -> None:
     last = None
     for _ in range(attempts):
         try:
-            with urlopen(url, timeout=3) as resp:  # noqa: S310 — preview we minted
+            with urlopen(url, timeout=3) as resp:  # noqa: S310  # preview we minted
                 if 200 <= resp.status < 500:
                     return
                 last = resp.status
-        except Exception as exc:  # noqa: BLE001 — poll until it exists
+        except Exception as exc:  # noqa: BLE001  # poll until it exists
             last = exc
         await asyncio.sleep(1)
     raise RuntimeError(f"preview never came up ({last}): {url}")
 
 
 async def _write_portal(vm: Any) -> None:
-    # files.write at runtime — Free has no custom templates.
+    # files.write at runtime. Free has no custom templates.
     mkdir = getattr(vm.files, "mkdir", None)
     if mkdir is not None:
         try:
@@ -116,7 +116,7 @@ async def end_vm(vm: Any) -> None:
 
     The desktop example also destroy()/close(); we call kill() which hits
     DELETE /sandboxes/:id and then closes the channel. TypeScript's
-    solari.close() hang is N/A here — this is Python.
+    solari.close() hang is N/A here; this is Python.
     """
     if vm is None:
         return
@@ -150,7 +150,7 @@ async def read_oracle(vm: Any, preview: str, spec) -> dict:
 
 
 async def boot_original(sbx: Any) -> Host:
-    """Golden boot. Desktop may 402 on Free — fall back to sandbox, no fake GUI."""
+    """Golden boot. Desktop may 402 on Free; fall back to sandbox, no fake GUI."""
     notes: List[str] = []
     handle = None
     kind = "desktop"
@@ -214,7 +214,7 @@ async def boot_original(sbx: Any) -> Host:
         await _wait_desktop_ready(handle)
         stream = getattr(handle, "streamUrl", "") or ""
         if looks_like_stream_url(stream):
-            notes.append("streamUrl is RFB/VNC — never Playwright against it")
+            notes.append("streamUrl is RFB/VNC; never Playwright against it")
     else:
         stream = ""
 
@@ -308,7 +308,7 @@ def refuse_playwright_on_stream(stream_url: str) -> Optional[str]:
 async def maybe_poll_browser_replay(solari: Any, session_id: str) -> Optional[int]:
     """Replay upload is async after release. Poll ~30s, same as the recording example.
 
-    Retention is documented as 1 day — we only check that *something* landed.
+    Retention is documented as 1 day. We only check that something landed.
     """
     from solari_browser.errors import SolariError
 

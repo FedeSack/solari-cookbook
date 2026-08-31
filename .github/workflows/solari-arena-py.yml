@@ -1,17 +1,15 @@
-name: solari-arena-py
+name: examples/solari-arena-py
 
 on:
-  push:
-    paths:
-      - "examples/solari-arena-py/**"
-      - ".github/workflows/solari-arena-py.yml"
   pull_request:
+  push:
     paths:
       - "examples/solari-arena-py/**"
       - ".github/workflows/solari-arena-py.yml"
 
 jobs:
-  unit:
+  examples-solari-arena-py:
+    name: examples/solari-arena-py
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -23,8 +21,7 @@ jobs:
           python-version: "3.11"
       - name: Install
         run: pip install -r requirements.txt
-      - name: Keyless unit tests (mocked API — do not spend credits)
+      - name: pytest
         run: pytest
         env:
           SOLARI_API_KEY: ""
-          SOLARI_ARENA_LIVE: ""

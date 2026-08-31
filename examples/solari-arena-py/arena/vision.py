@@ -43,7 +43,7 @@ def _open_rgb(png: bytes):
 
 
 def screenshot_illegible(png: bytes) -> bool:
-    """Blank, tiny, or near-uniform frames must HALT — do not click."""
+    """Blank, tiny, or near-uniform frames must HALT. Do not click."""
     if not png or len(png) < MIN_BYTES:
         return True
     try:
@@ -53,7 +53,7 @@ def screenshot_illegible(png: bytes) -> bool:
     w, h = im.size
     if w < MIN_EDGE or h < MIN_EDGE:
         return True
-    # Sample a coarse grid — getdata() is deprecated in Pillow 14.
+    # Sample a coarse grid. getdata() is deprecated in Pillow 14.
     step_x = max(1, w // 80)
     step_y = max(1, h // 45)
     sampled = []
@@ -109,7 +109,7 @@ def plan_click(
     """Plan a click in the same pixel space as the screenshot.
 
     ``expected_size`` is CSS viewport (in-browser, DPR 1) or desktop resolution.
-    A mismatch is FAIL_COORD_SPACE — we do not silently scale.
+    A mismatch is FAIL_COORD_SPACE. We do not silently scale.
     """
     # Decode first so a DPR-2 bitmap is FAIL_COORD_SPACE, not a guessed scale
     # and not a generic HALT. Tiny/undecodable frames still halt.

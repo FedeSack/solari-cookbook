@@ -72,7 +72,7 @@ class Handler(SimpleHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         return self.rfile.read(n) if n else b""
 
-    def do_GET(self) -> None:  # noqa: N802 — stdlib name
+    def do_GET(self) -> None:  # noqa: N802  # stdlib name
         parsed = urlparse(self.path)
         if parsed.path == "/eob.pdf":
             pdf = (ROOT / "eob.pdf")
@@ -98,7 +98,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return
         super().do_GET()
 
-    def do_POST(self) -> None:  # noqa: N802 — stdlib name
+    def do_POST(self) -> None:  # noqa: N802  # stdlib name
         parsed = urlparse(self.path)
         if parsed.path == "/login":
             raw = self._read_body().decode("utf-8")

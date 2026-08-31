@@ -1,7 +1,7 @@
 """Promote the fork write IFF the oracle agrees and the original stayed put.
 
 A snapshot-fork is a copy. Writes on the fork must not appear on the paused
-original. If they do, something leaked — FAIL_ORIGINAL_MUTATED, never promote.
+original. If they do, something leaked: FAIL_ORIGINAL_MUTATED, never promote.
 """
 
 from __future__ import annotations

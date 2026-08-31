@@ -1,7 +1,7 @@
 """Canvas CTA geometry. Numbers are pinned; keep portal/worklist.js in sync.
 
 Playwright ``locator('canvas').click()`` aims at the canvas bounding-box
-centre. The CTA is painted in a *corner*, so that click is a miss — and the
+centre. The CTA is painted in a *corner*, so that click is a miss, and the
 centre is covered by a DOM overlay, so actionability (visible + stable +
 elementFromPoint) often refuses the click anyway.
 """
@@ -23,9 +23,9 @@ OVERLAY_W = 420
 OVERLAY_H = 180
 
 # Distinctive paint. Vision matches pixels; there is no named AX node.
-CTA_RGB = (232, 93, 4)  # #E85D04 — target "Process"
-DECOY_RGB = (29, 78, 137)  # #1D4E89 — wrong claim
-LOGIN_FIELD_RGB = (255, 243, 191)  # #FFF3BF — username field, desktop pixel-find
+CTA_RGB = (232, 93, 4)  # #E85D04  target "Process"
+DECOY_RGB = (29, 78, 137)  # #1D4E89  wrong claim
+LOGIN_FIELD_RGB = (255, 243, 191)  # #FFF3BF  username field, desktop pixel-find
 LOGIN_SUBMIT_RGB = (45, 106, 79)  # #2D6A4F
 
 

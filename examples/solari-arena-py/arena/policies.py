@@ -1,7 +1,7 @@
 """Three policies, serial. CDP locators vs in-browser vision vs desktop mouse.
 
 Vision is a screenshot + a click in that pixel space. page.evaluate /
-dispatchEvent is banned. streamUrl is RFB — never Playwright.
+dispatchEvent is banned. streamUrl is RFB, never Playwright.
 """
 
 from __future__ import annotations
@@ -140,7 +140,7 @@ async def policy_browser_vision(browser: Any, host: Host, task: Task, *, region_
         shot = await page.screenshot(type="png", full_page=False)
         region = None
         if region_prior:
-            # In-dist CTA box only — an 80px OOD shift should miss this prior.
+            # In-dist CTA box only. An 80px OOD shift should miss this prior.
             box = cta_rect(task.cta_corner, 0, task.viewport_w, task.viewport_h)
             region = (box.x, box.y + 64, box.w, box.h)  # + header; page shot includes chrome? no, canvas is below header
             # page.screenshot of the full viewport includes the 64px header.

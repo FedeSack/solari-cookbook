@@ -1,9 +1,7 @@
-"""Reason codes for one canvas worklist. Dual scores sit next to these.
+"""Reason codes for one canvas worklist.
 
-success = the *right* claim JSON was processed.
+success = the right claim JSON was processed.
 side-effect-clean = the other claim did not move.
-
-This is not a leaderboard and not an LLM-as-judge.
 """
 
 from __future__ import annotations

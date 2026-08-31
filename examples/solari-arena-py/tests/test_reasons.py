@@ -1,4 +1,4 @@
-"""Reason taxonomy — every code the runner may emit is listed once."""
+"""Reason taxonomy: every code the runner may emit is listed once."""
 
 from arena.reasons import (
     ABORT_CONCURRENCY,

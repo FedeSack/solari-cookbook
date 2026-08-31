@@ -1,6 +1,7 @@
-"""Live Solari is a later one-shot after merge — not part of this test job.
+"""Live serial only when a key is present and SOLARI_ARENA_LIVE=1.
 
-These tests exist so a leftover key in the environment cannot spend credits.
+Without a key this skips and the rest of the suite still passes.
+Never print the key.
 """
 
 from __future__ import annotations
@@ -10,8 +11,13 @@ import os
 import pytest
 
 
-def test_live_is_not_this_job():
-    # Even if someone exported a key, pytest must not create VMs.
-    if os.environ.get("SOLARI_API_KEY"):
-        assert os.environ.get("SOLARI_ARENA_LIVE") != "1"
-    pytest.skip("inconclusive: live serial is a later one-shot after merge, not this job")
+def test_live_shortest_or_skip():
+    if not os.environ.get("SOLARI_API_KEY"):
+        pytest.skip("inconclusive: no SOLARI_API_KEY; live skipped")
+    if os.environ.get("SOLARI_ARENA_LIVE") != "1":
+        pytest.skip("inconclusive: live skipped (set SOLARI_ARENA_LIVE=1 for the shortest serial)")
+
+    from main import run_live
+
+    code = __import__("asyncio").run(run_live(shortest=True))
+    assert code in (0, 2)

@@ -1,15 +1,12 @@
-"""Solari Arena — a tiny OSWorld-style eval on the real products.
+"""Solari Arena: OSWorld-style eval on the real products.
 
-Hypothesis: CDP locators die on a canvas-painted worklist (no named AX;
-Playwright actionability is visible+stable+elementFromPoint; the CTA sits
-in a corner so locator('canvas').click() centre-misses). In-browser
-screenshot vision and desktop screenshot+mouse can finish the same goal.
-The interesting result is *disagreement* plus a FILE/HTTP oracle — not
-failover theatre.
+CDP locators miss a canvas-painted corner CTA (no named AX; Playwright
+clicks the canvas centre). Screenshot vision and desktop mouse can hit it.
+A FILE/HTTP oracle scores the right claim vs a side-effect on the other.
 
-Free plan = 3 browsers + 1 VM, so policies run SERIAL. Vision runs on a
-snapshot-fork; the original is paused or killed first. record:true cannot
-combine with fromSnapshot (400). No stealth (Free 402). No custom templates
+Free plan = 3 browsers + 1 VM, so policies run serial. Vision runs on a
+snapshot-fork; pause or kill the original first. record:true cannot combine
+with fromSnapshot (400). No stealth (Free 402). No custom templates
 (files.write at runtime). 1 vCPU / 2GB.
 """
 
@@ -22,7 +19,7 @@ import sys
 from pathlib import Path
 from typing import List
 
-from arena.geometry import HEADER_H, cta_rect
+from arena.geometry import HEADER_H, VIEWPORT_H, VIEWPORT_W, cta_rect
 from arena.policies import policy_browser_vision, policy_cdp, policy_desktop
 from arena.promote import original_leaked
 from arena.reasons import ABORT_CONCURRENCY, FAIL_OOD_SHIFT, FAIL_ORIGINAL_MUTATED
@@ -42,7 +39,6 @@ from arena.runtime import (
     row,
     snapshot_original,
 )
-from arena.geometry import VIEWPORT_H, VIEWPORT_W
 from arena.tasks import Task, load_tasks
 
 HERE = Path(__file__).resolve().parent
@@ -79,15 +75,16 @@ async def _run_cdp(solari, host: Host, tasks: List[Task], rows: List[dict]) -> N
                 print(f"  note: {result.note}")
     finally:
         await browser.close()
-    replay_n = await maybe_poll_browser_replay(solari, session_id)
-    if replay_n is None:
-        print("  replay: none after ~30s (upload is async; retention is 1 day)")
-    else:
-        print(f"  replay: {replay_n} bytes")
+    if os.environ.get("SOLARI_ARENA_REPLAY") == "1":
+        replay_n = await maybe_poll_browser_replay(solari, session_id)
+        if replay_n is None:
+            print("  replay: none after ~30s (upload is async; retention is 1 day)")
+        else:
+            print(f"  replay: {replay_n} bytes")
 
 
 async def _boot_fork_from_snap(sbx, kind: str, snap_id: str) -> Host:
-    """Original already released. fromSnapshot only — no record flag."""
+    """Original already released. fromSnapshot only; no record flag."""
     from arena.runtime import _wait_desktop_ready, _wait_preview
 
     if kind == "desktop":
@@ -159,22 +156,25 @@ async def _run_fork_policies(solari, fork: Host, task: Task, rows: List[dict]) -
         print(f"  note: {desk.note}")
 
 
-async def run_live() -> int:
+async def run_live(*, shortest: bool = True) -> int:
     key = api_key()
     if not key:
         print("inconclusive: SOLARI_API_KEY is not set; live serial skipped")
-        print("keyless tests: pytest tests")
+        print("keyless tests: pytest")
         return 0
 
-    # Budget lock: CI / pytest must not create browsers or VMs.
-    if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("SOLARI_ARENA_LIVE") != "1":
-        print("refusing live Solari calls (set SOLARI_ARENA_LIVE=1 for a one-shot after merge)")
+    # pytest must not create VMs unless someone opted in. A leftover key in
+    # the shell is not enough; CI sets the key empty.
+    if os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("SOLARI_ARENA_LIVE") != "1":
+        print("inconclusive: live skipped under pytest (set SOLARI_ARENA_LIVE=1 to run)")
         return 0
 
     from solari_browser import Solari
     from solari_sandbox import SandboxClient
 
     tasks = load_tasks(HERE / "tasks")
+    if shortest:
+        tasks = [t for t in tasks if not t.is_ood][:1] or tasks[:1]
     rows: List[dict] = []
     print("tasks:", ", ".join(t.id for t in tasks))
     print("policies: cdp (original) → vision (fork) → desktop (fork)  [serial]")
@@ -235,7 +235,10 @@ async def run_live() -> int:
         else:
             print(f"original {first_release}; leak check not applicable (no live original)")
 
-        print("---")
+        print("reason-code table")
+        print("task                   policy     success side_effect reason                     promote")
+        for r in rows:
+            _print_row(r)
         print(json.dumps({"rows": rows, "fork_release": first_release, "kind": original.kind}, indent=2))
         return 0
     except RuntimeError as exc:

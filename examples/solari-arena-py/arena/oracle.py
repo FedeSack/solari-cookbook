@@ -1,4 +1,4 @@
-"""FILE / HTTP oracle. The claim JSON is the ground truth — not an LLM."""
+"""FILE / HTTP oracle. The claim JSON is the ground truth, not an LLM."""
 
 from __future__ import annotations
 
@@ -96,5 +96,5 @@ def fetch_http_oracle(base_url: str, spec: OracleSpec, timeout_s: float = 5.0) -
         url = spec.path
     else:
         url = urljoin(base_url.rstrip("/") + "/", spec.path.lstrip("/"))
-    with urlopen(url, timeout=timeout_s) as resp:  # noqa: S310 — host we started
+    with urlopen(url, timeout=timeout_s) as resp:  # noqa: S310  # host we started
         return parse_claim_json(resp.read().decode("utf-8"))
