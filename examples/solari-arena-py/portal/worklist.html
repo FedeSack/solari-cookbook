@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Worklist / SYNTHETIC</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="watermark" aria-hidden="true">SYNTHETIC / NO PHI</div>
+  <header class="bar">
+    <strong>Worklist</strong>
+    <span>canvas-painted · no named controls</span>
+    <a href="/eob.pdf">EOB (synthetic PDF)</a>
+  </header>
+  <div class="stage">
+    <!--
+      The CTA is PAINTED on this canvas. There is no <button> and no AX name.
+      WebVoyager-style Set-of-Mark needs a DOM node to number; it has none.
+      locator('canvas').click() hits the centre, which this overlay covers.
+    -->
+    <canvas id="worklist" width="1280" height="656" aria-hidden="true"></canvas>
+    <aside id="help-overlay">
+      <h2>Desk notes</h2>
+      <p>This overlay is real DOM on the canvas centre. It is not a Process control. The Process CTA is painted in a corner.</p>
+    </aside>
+    <div id="status"></div>
+  </div>
+  <script src="/worklist.js"></script>
+</body>
+</html>

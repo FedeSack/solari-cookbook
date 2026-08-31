@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Northbridge Clinic Desk / SYNTHETIC</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="watermark" aria-hidden="true">SYNTHETIC / NO PHI</div>
+  <header class="bar">
+    <strong>Northbridge Clinic Desk</strong>
+    <span>synthetic roster · not a payer portal</span>
+    <a href="/eob.pdf">EOB (synthetic PDF)</a>
+  </header>
+  <main class="login">
+    <h1>Sign in</h1>
+    <p>Clerk credentials are printed on the badge: <code>clerk</code> / <code>synthetic</code>.</p>
+    <form id="login-form" method="post" action="/login">
+      <label for="username">Username</label>
+      <input id="username" name="username" autocomplete="username" />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" />
+      <button id="login-submit" type="submit">Sign in</button>
+    </form>
+  </main>
+  <script>
+    // Keep the task query string (ctaCorner, oodShiftPx, claimId) across login.
+    const next = "/worklist.html" + location.search;
+    document.getElementById("login-form").action = "/login?next=" + encodeURIComponent(next);
+  </script>
+</body>
+</html>
