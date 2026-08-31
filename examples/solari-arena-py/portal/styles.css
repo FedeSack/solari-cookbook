@@ -1,0 +1,115 @@
+/* Synthetic clinic chrome. No real payer branding. */
+:root {
+  --ink: #1b1f24;
+  --muted: #5c6770;
+  --paper: #f4f1ea;
+  --rule: #d4cfc4;
+  --cta: #e85d04;
+  --decoy: #1d4e89;
+  --login-field: #fff3bf;
+  --login-submit: #2d6a4f;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+  font: 14px/1.4 "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+.watermark {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64px;
+  letter-spacing: 0.18em;
+  color: rgba(180, 40, 40, 0.12);
+  font-weight: 700;
+  transform: rotate(-18deg);
+  z-index: 50;
+}
+header.bar {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--rule);
+  background: #fffdf8;
+  position: relative;
+  z-index: 2;
+}
+header.bar strong { letter-spacing: 0.04em; }
+header.bar a { color: var(--muted); }
+main.login {
+  height: 656px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 72px;
+}
+label { display: block; margin: 10px 0 4px; color: var(--muted); }
+#username {
+  background: var(--login-field);
+  width: 320px;
+  height: 36px;
+  border: 1px solid var(--rule);
+  padding: 0 10px;
+}
+#password {
+  width: 320px;
+  height: 36px;
+  border: 1px solid var(--rule);
+  padding: 0 10px;
+  background: #fff;
+}
+#login-submit {
+  margin-top: 18px;
+  width: 320px;
+  height: 40px;
+  border: 0;
+  background: var(--login-submit);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.stage {
+  position: relative;
+  width: 1280px;
+  height: 656px;
+}
+#worklist {
+  display: block;
+  width: 1280px;
+  height: 656px;
+}
+#help-overlay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 420px;
+  height: 180px;
+  margin-left: -210px;
+  margin-top: -90px;
+  background: #fff;
+  border: 1px solid var(--rule);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 16px 20px;
+  z-index: 3;
+}
+#help-overlay h2 { margin: 0 0 8px; font-size: 16px; }
+#help-overlay p { margin: 0; color: var(--muted); }
+#status {
+  position: absolute;
+  left: 16px;
+  bottom: 8px;
+  z-index: 4;
+  font-size: 12px;
+  color: var(--muted);
+}

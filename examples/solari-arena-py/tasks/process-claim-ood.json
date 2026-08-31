@@ -1,0 +1,19 @@
+{
+  "id": "process-claim-ood",
+  "seed": 7,
+  "viewport": { "width": 1280, "height": 720 },
+  "deviceScaleFactor": 1,
+  "ctaCorner": "bottom-right",
+  "oodShiftPx": 80,
+  "instruction": "Same goal as in-distribution: process claim CLM-1001 and leave CLM-1002 untouched. The CTA is shifted 80px toward the canvas centre.",
+  "oracle": {
+    "type": "file",
+    "path": "/tmp/clinic/data/CLM-1001.json",
+    "claimId": "CLM-1001"
+  },
+  "sideOracle": {
+    "type": "http",
+    "path": "/api/claims/CLM-1002",
+    "claimId": "CLM-1002"
+  }
+}

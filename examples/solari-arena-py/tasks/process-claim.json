@@ -1,0 +1,19 @@
+{
+  "id": "process-claim",
+  "seed": 7,
+  "viewport": { "width": 1280, "height": 720 },
+  "deviceScaleFactor": 1,
+  "ctaCorner": "bottom-right",
+  "oodShiftPx": 0,
+  "instruction": "Log in as clerk, then process claim CLM-1001. Do not touch CLM-1002. The worklist is canvas-painted; a centre click is a miss.",
+  "oracle": {
+    "type": "file",
+    "path": "/tmp/clinic/data/CLM-1001.json",
+    "claimId": "CLM-1001"
+  },
+  "sideOracle": {
+    "type": "file",
+    "path": "/tmp/clinic/data/CLM-1002.json",
+    "claimId": "CLM-1002"
+  }
+}
