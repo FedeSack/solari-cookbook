@@ -92,4 +92,5 @@ def test_shipped_tasks_parse(tmp_path):
     assert tasks[0].device_scale_factor == 1
     ood = next(t for t in tasks if t.is_ood)
     assert ood.ood_shift_px == 80
-    assert ood.side_oracle.type == "http"
+    assert ood.oracle.type == "file"
+    assert ood.side_oracle.type == "file"

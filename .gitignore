@@ -3,6 +3,7 @@ package-lock.json
 .env
 __pycache__/
 *.pyc
+.pytest_cache/
 .venv/
 venv/
 screenshot.png

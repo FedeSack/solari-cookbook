@@ -12,6 +12,7 @@ from typing import Any, Optional
 
 from .geometry import (
     CTA_RGB,
+    HEADER_H,
     LOGIN_FIELD_RGB,
     LOGIN_SUBMIT_RGB,
     VIEWPORT_H,
@@ -20,6 +21,7 @@ from .geometry import (
     looks_like_stream_url,
 )
 from .reasons import (
+    ABORT_STREAM_NOT_PLAYWRIGHT,
     FAIL_CANVAS_CLICK_MISS,
     FAIL_NO_MUTATION,
     FAIL_OOD_SHIFT,
@@ -28,10 +30,30 @@ from .reasons import (
     HALT_ILLEGIBLE,
     PASS_ORACLE,
 )
-from .runtime import PORT, Host, read_oracle, task_url
+from .runtime import PORT, Host, read_oracle, refuse_playwright_on_stream, task_url
 from .tasks import Task
 from .vision import banned_dom_click_methods, plan_click
 from .promote import promote_iff
+
+# Hardcoded guest binaries only. argv is not a shell; we still refuse
+# unexpected names before interpolating into `sh -c`.
+_CHROME_NAMES = ("google-chrome", "chrome", "chromium")
+
+
+def chrome_probe_argv(name: str) -> tuple:
+    if name not in _CHROME_NAMES:
+        raise ValueError(f"refusing unexpected binary name: {name!r}")
+    return "sh", ["-c", f"command -v {name}"]
+
+
+def _probe_exit_code(result: Any) -> int:
+    return int(getattr(result, "exit_code", getattr(result, "exitCode", 1)))
+
+
+def refuse_playwright_preview(url: str) -> None:
+    """Playwright may open the HTTP preview, never streamUrl (RFB/VNC)."""
+    if refuse_playwright_on_stream(url) or looks_like_stream_url(url):
+        raise RuntimeError(ABORT_STREAM_NOT_PLAYWRIGHT)
 
 
 @dataclass
@@ -47,6 +69,7 @@ class PolicyResult:
 
 async def _login_cdp(page: Any, url: str) -> None:
     """Real DOM. CDP *must* get through this; the worklist is the hard part."""
+    refuse_playwright_preview(url)
     await page.goto(url, wait_until="domcontentloaded")
     await page.locator("#username").fill("clerk")
     await page.locator("#password").fill("synthetic")
@@ -84,13 +107,14 @@ async def policy_cdp(browser: Any, host: Host, task: Task) -> PolicyResult:
     before_s = await read_oracle(host.handle, host.preview, task.side_oracle)
     clicked = False
     hint: Optional[str] = None
+    som_missing = False
+    abort: Optional[str] = None
     try:
         await _login_cdp(page, task_url(host.preview, task, "/"))
 
         # Set-of-Mark / named AX: the Process CTA is paint. SoM needs DOM.
         named = page.get_by_role("button", name="Process")
-        if await named.count() == 0:
-            hint = FAIL_SOM_NO_DOM
+        som_missing = await named.count() == 0
 
         canvas = page.locator("canvas#worklist")
         try:
@@ -99,12 +123,31 @@ async def policy_cdp(browser: Any, host: Host, task: Task) -> PolicyResult:
             # relative to the corner CTA. force=True would be cheating.
             await canvas.click(timeout=5_000)
             clicked = True
-            hint = FAIL_CANVAS_CLICK_MISS
         except Exception:
-            hint = FAIL_CANVAS_CLICK_MISS
+            clicked = False
+        # After a CDP miss the useful next-policy hint is the centre click,
+        # not "SoM missing" — we already observed that by counting named
+        # Process controls. FAIL_SOM_NO_DOM is a note, not a second verdict.
+        hint = FAIL_CANVAS_CLICK_MISS
         await asyncio.sleep(0.8)
+    except RuntimeError as exc:
+        if str(exc) == ABORT_STREAM_NOT_PLAYWRIGHT:
+            abort = ABORT_STREAM_NOT_PLAYWRIGHT
+        else:
+            hint = FAIL_CANVAS_CLICK_MISS
     finally:
         await ctx.close()
+
+    if abort:
+        return PolicyResult(
+            policy="cdp",
+            reason=abort,
+            success=False,
+            side_effect_clean=True,
+            promoted=False,
+            clicked=False,
+            note="refused Playwright on streamUrl",
+        )
 
     after_t = await read_oracle(host.handle, host.preview, task.oracle)
     after_s = await read_oracle(host.handle, host.preview, task.side_oracle)
@@ -115,11 +158,10 @@ async def policy_cdp(browser: Any, host: Host, task: Task) -> PolicyResult:
         result.reason = PASS_ORACLE
         result.promoted = False  # CDP ran on the original; we do not promote a pre-fork write
         result.note = "cdp unexpectedly mutated; not promoted"
-    elif hint == FAIL_SOM_NO_DOM and result.reason == FAIL_NO_MUTATION:
-        result.reason = FAIL_SOM_NO_DOM
-        result.note = "no named Process control; canvas centre click also missed"
-    elif result.reason in (FAIL_NO_MUTATION, FAIL_SOM_NO_DOM):
+    else:
         result.reason = FAIL_CANVAS_CLICK_MISS
+        if som_missing:
+            result.note = f"no named Process control ({FAIL_SOM_NO_DOM}); centre click missed"
     return result
 
 
@@ -135,18 +177,15 @@ async def policy_browser_vision(browser: Any, host: Host, task: Task, *, region_
     before_s = await read_oracle(host.handle, host.preview, task.side_oracle)
     clicked = False
     hint: Optional[str] = None
+    abort: Optional[str] = None
     try:
         await _login_cdp(page, task_url(host.preview, task, "/"))
         shot = await page.screenshot(type="png", full_page=False)
         region = None
         if region_prior:
             # In-dist CTA box only. An 80px OOD shift should miss this prior.
+            # page.screenshot includes the 64px header; CTA coords are canvas-relative.
             box = cta_rect(task.cta_corner, 0, task.viewport_w, task.viewport_h)
-            region = (box.x, box.y + 64, box.w, box.h)  # + header; page shot includes chrome? no, canvas is below header
-            # page.screenshot of the full viewport includes the 64px header.
-            # CTA coords in worklist.js are canvas-relative. Add HEADER_H.
-            from .geometry import HEADER_H
-
             region = (box.x, box.y + HEADER_H, box.w, box.h)
         plan = plan_click(
             shot,
@@ -162,8 +201,24 @@ async def policy_browser_vision(browser: Any, host: Host, task: Task, *, region_
             await page.mouse.click(plan.x, plan.y)
             clicked = True
             await asyncio.sleep(0.8)
+    except RuntimeError as exc:
+        if str(exc) == ABORT_STREAM_NOT_PLAYWRIGHT:
+            abort = ABORT_STREAM_NOT_PLAYWRIGHT
+        else:
+            hint = hint or HALT_ILLEGIBLE
     finally:
         await ctx.close()
+
+    if abort:
+        return PolicyResult(
+            policy="vision",
+            reason=abort,
+            success=False,
+            side_effect_clean=True,
+            promoted=False,
+            clicked=False,
+            note="refused Playwright on streamUrl",
+        )
 
     after_t = await read_oracle(host.handle, host.preview, task.oracle)
     after_s = await read_oracle(host.handle, host.preview, task.side_oracle)
@@ -184,9 +239,10 @@ async def policy_browser_vision(browser: Any, host: Host, task: Task, *, region_
 
 
 async def _open_chrome(desktop: Any, url: str) -> None:
-    for name in ("google-chrome", "chrome", "chromium"):
-        probe = await desktop.exec("command", args=["-v", name])
-        if getattr(probe, "exitCode", 1) == 0 and str(getattr(probe, "stdout", "")).strip():
+    for name in _CHROME_NAMES:
+        cmd, args = chrome_probe_argv(name)
+        probe = await desktop.exec(cmd, args=args)
+        if _probe_exit_code(probe) == 0 and str(getattr(probe, "stdout", "")).strip():
             await desktop.open(name, args=["--window-size=1280,720", "--window-position=0,0", url])
             return
     raise RuntimeError("no Chrome/Chromium on this desktop template")
@@ -203,11 +259,11 @@ async def policy_desktop(host: Host, task: Task) -> PolicyResult:
             clicked=False,
             note="skipped: sandbox fallback, no GUI to fake",
         )
-    # streamUrl is raw RFB/VNC. We print it for a human viewer; we never
-    # chromium.connect() it. That abort code exists so a future caller cannot
-    # "just use Playwright" against the desktop stream.
-    if looks_like_stream_url(host.stream_url):
-        pass
+    # streamUrl existing is normal (RFB/VNC). Aborting here would kill policy 3
+    # on every real desktop. The interlock is refuse_playwright_preview(),
+    # which CDP/vision call before page.goto. This policy uses OS mouse.
+    if refuse_playwright_on_stream(host.stream_url):
+        host.notes.append("streamUrl is RFB/VNC; desktop policy will not hand it to Playwright")
 
     desktop = host.handle
     before_t = await read_oracle(desktop, host.preview, task.oracle)

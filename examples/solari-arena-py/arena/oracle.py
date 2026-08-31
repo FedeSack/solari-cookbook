@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
-from urllib.parse import urljoin
-from urllib.request import urlopen
 
 from .reasons import FAIL_NO_MUTATION, FAIL_WRONG_CLAIM, PASS_ORACLE
 
@@ -86,15 +84,3 @@ def score_oracle(
         target_after=dict(target_after),
         side_after=dict(side_after),
     )
-
-
-def fetch_http_oracle(base_url: str, spec: OracleSpec, timeout_s: float = 5.0) -> dict:
-    """HTTP oracle: GET the path (absolute, or relative to the preview origin)."""
-    if spec.type != "http":
-        raise ValueError("fetch_http_oracle requires oracle.type=http")
-    if spec.path.startswith("http://") or spec.path.startswith("https://"):
-        url = spec.path
-    else:
-        url = urljoin(base_url.rstrip("/") + "/", spec.path.lstrip("/"))
-    with urlopen(url, timeout=timeout_s) as resp:  # noqa: S310  # host we started
-        return parse_claim_json(resp.read().decode("utf-8"))

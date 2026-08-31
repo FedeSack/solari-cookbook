@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import json
 import os
+from pathlib import Path
 
 import pytest
 
@@ -17,13 +19,14 @@ from arena.reasons import (
 from arena.runtime import (
     GUEST_ROOT,
     boot_original,
+    end_vm,
+    read_oracle,
     refuse_playwright_on_stream,
     release_then_fork,
+    reset_claim_files,
 )
 from tests.fakes import FakeGatewayError, FakeSandboxClient
 
-PENDING = json.dumps({"claimId": "CLM-1001", "status": "pending"}).encode()
-SIDE = json.dumps({"claimId": "CLM-1002", "status": "pending"}).encode()
 DONE = json.dumps({"claimId": "CLM-1001", "status": "processed"}).encode()
 
 
@@ -51,6 +54,15 @@ def test_run_live_without_key_is_inconclusive(capsys):
 def test_run_live_refuses_under_pytest_even_with_a_key(monkeypatch, capsys):
     monkeypatch.setenv("SOLARI_API_KEY", "slr_live_TEST_NOT_A_REAL_KEY")
     monkeypatch.delenv("SOLARI_ARENA_LIVE", raising=False)
+
+    real_import = builtins.__import__
+
+    def guarded(name, globals=None, locals=None, fromlist=(), level=0):  # noqa: A002
+        if name in {"solari_browser", "solari_sandbox"}:
+            raise AssertionError(f"must not import {name} without SOLARI_ARENA_LIVE=1")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", guarded)
     from main import run_live
 
     code = asyncio.run(run_live())
@@ -110,9 +122,11 @@ def test_pause_plus_fork_429_falls_back_to_kill_then_from_snapshot():
     assert host.handle.killed
     assert fork.handle.id != host.handle.id
     assert any("429" in n for n in host.notes)
+    assert not any(c[0] == "close" for c in sbx.calls)
 
 
 def test_record_true_with_from_snapshot_is_400():
+    """API shape: the fake gateway rejects the combo. Production never sends it."""
     sbx = FakeSandboxClient()
 
     async def _go():
@@ -124,6 +138,17 @@ def test_record_true_with_from_snapshot_is_400():
     assert err.status == 400
     assert err.code == "RecordingRequiresGoldenBoot"
 
+    async def _prod():
+        host = await boot_original(sbx)
+        snap = await host.handle.snapshot("after-setup")
+        return await release_then_fork(sbx, host, snap)
+
+    asyncio.run(_prod())
+    forks = [c for c in sbx.calls if c[0] == "create_desktop" and c[1].get("from_snapshot")]
+    assert forks
+    for call in forks:
+        assert "record" not in call[1]
+
 
 def test_stream_url_is_not_a_playwright_target():
     assert (
@@ -133,21 +158,33 @@ def test_stream_url_is_not_a_playwright_target():
 
 
 def test_mocked_file_oracle_promote():
+    from arena.tasks import load_task
+
+    task = load_task(Path(__file__).resolve().parents[1] / "tasks" / "process-claim.json")
     sbx = FakeSandboxClient()
-    sbx.files[f"{GUEST_ROOT}/data/CLM-1001.json"] = PENDING
-    sbx.files[f"{GUEST_ROOT}/data/CLM-1002.json"] = SIDE
-    # Fork write: only the target claim moves.
-    after_t = json.loads(DONE)
-    after_s = json.loads(SIDE)
+
+    async def _go():
+        host = await boot_original(sbx)
+        before_t = await read_oracle(host.handle, host.preview, task.oracle)
+        before_s = await read_oracle(host.handle, host.preview, task.side_oracle)
+        await host.handle.files.write(f"{GUEST_ROOT}/data/CLM-1001.json", DONE)
+        after_t = await read_oracle(host.handle, host.preview, task.oracle)
+        after_s = await read_oracle(host.handle, host.preview, task.side_oracle)
+        return before_t, before_s, after_t, after_s
+
+    before_t, before_s, after_t, after_s = asyncio.run(_go())
+    assert before_t["status"] == "pending"
+    assert before_s["status"] == "pending"
+    assert after_t["status"] == "processed"
     d = promote_iff(
-        target_before=json.loads(PENDING),
+        target_before=before_t,
         target_after=after_t,
-        side_before=json.loads(SIDE),
+        side_before=before_s,
         side_after=after_s,
-        original_target=json.loads(PENDING),
-        original_side=json.loads(SIDE),
-        baseline_target=json.loads(PENDING),
-        baseline_side=json.loads(SIDE),
+        original_target=before_t,
+        original_side=before_s,
+        baseline_target=before_t,
+        baseline_side=before_s,
     )
     assert d.promote and d.reason == PASS_ORACLE
 
@@ -165,3 +202,125 @@ def test_map_concurrency_on_create():
     from tests.fakes import FakeConcurrencyError
 
     assert _map_create_error(FakeConcurrencyError()) == ABORT_CONCURRENCY
+
+
+def test_boot_original_does_not_record_by_default(monkeypatch):
+    monkeypatch.delenv("SOLARI_ARENA_REPLAY", raising=False)
+    sbx = FakeSandboxClient()
+    asyncio.run(boot_original(sbx))
+    creates = [c for c in sbx.calls if c[0] == "create_desktop"]
+    assert creates
+    assert "record" not in creates[0][1]
+
+
+def test_boot_original_records_only_when_opted_in(monkeypatch):
+    monkeypatch.setenv("SOLARI_ARENA_REPLAY", "1")
+    sbx = FakeSandboxClient()
+    asyncio.run(boot_original(sbx))
+    creates = [c for c in sbx.calls if c[0] == "create_desktop"]
+    assert creates[0][1].get("record") is True
+
+
+def test_end_vm_retries_kill_and_never_closes():
+    class Dead:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        async def kill(self) -> None:
+            self.calls.append("kill")
+            raise RuntimeError("still billed")
+
+        async def close(self) -> None:
+            self.calls.append("close")
+            raise AssertionError("close is not teardown")
+
+    dead = Dead()
+    asyncio.run(end_vm(dead))
+    assert dead.calls == ["kill", "kill"]
+
+
+def test_end_vm_succeeds_on_second_kill():
+    class Flaky:
+        def __init__(self) -> None:
+            self.n = 0
+            self.calls: list[str] = []
+
+        async def kill(self) -> None:
+            self.calls.append("kill")
+            self.n += 1
+            if self.n == 1:
+                raise RuntimeError("transient")
+
+        async def close(self) -> None:
+            self.calls.append("close")
+
+    handle = Flaky()
+    asyncio.run(end_vm(handle))
+    assert handle.calls == ["kill", "kill"]
+
+
+def test_reset_claim_files_rewrites_pending_from_portal_data():
+    sbx = FakeSandboxClient()
+
+    async def _go():
+        host = await boot_original(sbx)
+        await host.handle.files.write(f"{GUEST_ROOT}/data/CLM-1001.json", DONE)
+        await reset_claim_files(host.handle)
+        return json.loads(await host.handle.files.read_text(f"{GUEST_ROOT}/data/CLM-1001.json"))
+
+    claim = asyncio.run(_go())
+    assert claim["status"] == "pending"
+    assert claim["claimId"] == "CLM-1001"
+
+
+def test_write_portal_skips_pycache(monkeypatch, tmp_path):
+    from arena import runtime
+
+    junk = tmp_path / "__pycache__" / "x.pyc"
+    junk.parent.mkdir()
+    junk.write_bytes(b"nope")
+    (tmp_path / "server.py").write_text("print(1)\n")
+    (tmp_path / "data").mkdir()
+    monkeypatch.setattr(runtime, "PORTAL_DIR", tmp_path)
+    sbx = FakeSandboxClient()
+    asyncio.run(boot_original(sbx))
+    keys = list(sbx.files)
+    assert any(k.endswith("server.py") for k in keys)
+    assert not any("__pycache__" in k or k.endswith(".pyc") for k in keys)
+
+
+def test_wait_desktop_ready_raises_if_never_ready(monkeypatch):
+    import arena.runtime as rt
+    from arena.runtime import _wait_desktop_ready
+
+    class Never:
+        async def health(self):
+            class H:
+                ready = False
+
+            return H()
+
+    async def _fast(_s):
+        return None
+
+    monkeypatch.setattr(rt.asyncio, "sleep", _fast)
+    with pytest.raises(RuntimeError, match="never reported ready"):
+        asyncio.run(_wait_desktop_ready(Never()))
+
+
+def test_chrome_probe_uses_sh_not_a_command_binary():
+    from arena.policies import chrome_probe_argv
+
+    cmd, args = chrome_probe_argv("google-chrome")
+    assert cmd == "sh"
+    assert args == ["-c", "command -v google-chrome"]
+    with pytest.raises(ValueError, match="unexpected"):
+        chrome_probe_argv("rm")
+
+
+def test_playwright_preview_refuses_stream_url():
+    from arena.policies import refuse_playwright_preview
+
+    with pytest.raises(RuntimeError, match=ABORT_STREAM_NOT_PLAYWRIGHT):
+        refuse_playwright_preview("wss://api.getsolari.com/stream/vm1")
+    refuse_playwright_preview("http://127.0.0.1:8765/")

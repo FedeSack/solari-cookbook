@@ -54,8 +54,10 @@ def _print_row(r: dict) -> None:
 
 async def _run_cdp(solari, host: Host, tasks: List[Task], rows: List[dict]) -> None:
     """Policy 1 on the ORIGINAL. Login is real DOM; worklist should miss."""
-    # recording=True is per session. Poll ~30s after release. Retention: 1 day.
-    browser = await solari.launch(recording=True, stealth=False)
+    # recording=True is per session and extra spend. Default off.
+    # Opt in with SOLARI_ARENA_REPLAY=1; poll ~30s after release. Retention: 1 day.
+    record = os.environ.get("SOLARI_ARENA_REPLAY") == "1"
+    browser = await solari.launch(recording=record, stealth=False)
     session_id = browser.id
     try:
         for task in tasks:
@@ -192,13 +194,19 @@ async def run_live(*, shortest: bool = True) -> int:
             print(" ", note)
         print("preview:", original.preview)
         if original.stream_url:
-            print("watch (VNC, not Playwright):", original.stream_url)
+            # streamUrl is a capability (docs: treat as secret). Do not print it.
+            print("streamUrl: (rfb/vnc; not printed; never Playwright)")
 
         first = tasks[0]
         baseline_t = await read_oracle(original.handle, original.preview, first.oracle)
         baseline_s = await read_oracle(original.handle, original.preview, first.side_oracle)
 
         await _run_cdp(solari, original, tasks, rows)
+        # CDP runs on the original. Reset claim JSON before snapshot so a
+        # surprising hit cannot become the fork's baseline.
+        from arena.runtime import reset_claim_files
+
+        await reset_claim_files(original.handle)
 
         snap_id = await snapshot_original(original)
         print("snapshot:", snap_id)

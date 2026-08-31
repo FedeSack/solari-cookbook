@@ -17,6 +17,8 @@ def test_live_shortest_or_skip():
     if os.environ.get("SOLARI_ARENA_LIVE") != "1":
         pytest.skip("inconclusive: live skipped (set SOLARI_ARENA_LIVE=1 for the shortest serial)")
 
+    # Gate, not a score. 0 = serial finished; 2 = ABORT_CONCURRENCY.
+    # This path spends credits; CI must keep SOLARI_API_KEY empty.
     from main import run_live
 
     code = __import__("asyncio").run(run_live(shortest=True))

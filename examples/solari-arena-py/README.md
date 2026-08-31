@@ -31,9 +31,10 @@ inspectable. If that 429s, kill and `fromSnapshot`. If desktop create returns
 3. CDP locators on the original (DPR 1, no stealth). Login is real DOM and
    must pass. The worklist should miss (`FAIL_CANVAS_CLICK_MISS` /
    `FAIL_SOM_NO_DOM`). Set-of-Mark needs DOM; a canvas CTA has none.
-4. Snapshot (`POST /sandboxes/:id/snapshots`). `record: true` is fine on this
-   golden boot. Combined with `fromSnapshot` it is 400
-   `RecordingRequiresGoldenBoot`.
+4. Snapshot (`POST /sandboxes/:id/snapshots`). Desktop `record: true` and
+   browser `recording=True` are extra spend; default off. Opt in with
+   `SOLARI_ARENA_REPLAY=1` (legal on the golden boot only). Combined with
+   `fromSnapshot` it is 400 `RecordingRequiresGoldenBoot`.
 5. Pause or kill the original. Free is one concurrent VM; do not keep original
    and fork live.
 6. In-browser vision and desktop mouse run only on the fork, serial (Free = 3
@@ -59,13 +60,17 @@ Reason codes: `PASS_ORACLE`, `FAIL_WRONG_CLAIM`, `FAIL_NO_MUTATION`,
 ## Limitations
 
 - Free serial schedule: one VM, three browser slots, policies in sequence.
-- Browser replay retention is 1 day. Recording is per session; the upload is
-  async after release, so poll about 30s. `GET /sessions/:id` is not VM health;
-  desktops use `desktop.health()`.
+- Browser replay retention is 1 day. Recording is per session and opt-in
+  (`SOLARI_ARENA_REPLAY=1`); the upload is async after release, so poll about
+  30s. `GET /sessions/:id` is not VM health; desktops use `desktop.health()`.
+  `kill()` ends a VM; `close()` only drops the local channel.
 - Desktop is a paid entitlement. A 402 here means sandbox + browsers, not a
   fake GUI.
 - Pixel vision is a colour-blob centroid. Recolour the CTA and it misses, the
   same way a locator misses a renamed button.
+- Preview URLs are public. Claim JSON is file-oracle on the guest; GET
+  `/api/claims/` requires the session cookie. The login page and synthetic PDF
+  stay reachable.
 - The TypeScript `solari.close()` hang does not apply; this is Python.
 
 ## Run

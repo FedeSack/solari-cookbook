@@ -80,6 +80,9 @@ class Handler(SimpleHTTPRequestHandler):
             self._send(200, body, "application/pdf")
             return
         if parsed.path.startswith("/api/claims/"):
+            if not self._authed():
+                self._send(401, b'{"error":"auth"}', "application/json")
+                return
             claim_id = parsed.path.rsplit("/", 1)[-1]
             try:
                 path = _claim_path(claim_id)

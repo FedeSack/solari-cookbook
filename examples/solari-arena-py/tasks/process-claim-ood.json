@@ -12,8 +12,8 @@
     "claimId": "CLM-1001"
   },
   "sideOracle": {
-    "type": "http",
-    "path": "/api/claims/CLM-1002",
+    "type": "file",
+    "path": "/tmp/clinic/data/CLM-1002.json",
     "claimId": "CLM-1002"
   }
 }

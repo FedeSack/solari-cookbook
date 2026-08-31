@@ -122,6 +122,18 @@ class FakeHandle:
     async def close(self) -> None:
         self._calls.append(("close", self.id))
 
+    async def exec(self, cmd: str, args=None, **kwargs: Any) -> Any:
+        self._calls.append(("exec", cmd, list(args or [])))
+
+        @dataclass
+        class _R:
+            exitCode: int = 1
+            exit_code: int = 1
+            stdout: str = ""
+            stderr: str = ""
+
+        return _R()
+
 
 class FakeSandboxClient:
     """Mirrors the subset of SandboxClient the runner calls."""

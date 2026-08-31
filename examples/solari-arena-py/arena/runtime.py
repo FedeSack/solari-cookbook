@@ -12,8 +12,8 @@ use desktop.health() after X11 is up, same as desktop-computer-use-py.
 from __future__ import annotations
 
 import asyncio
-import json
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -33,7 +33,7 @@ PORTAL_DIR = HERE / "portal"
 # Free-plan shape the runner actually respects: 3 browsers + 1 VM, serial.
 CPU = 1
 MEM_MB = 2048
-TIMEOUT_MS = 10 * 60_000
+TIMEOUT_MS = 5 * 60_000
 
 
 @dataclass
@@ -87,9 +87,18 @@ async def _write_portal(vm: Any) -> None:
     for path in sorted(PORTAL_DIR.rglob("*")):
         if not path.is_file():
             continue
+        if "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
+            continue
         rel = path.relative_to(PORTAL_DIR).as_posix()
         dest = f"{GUEST_ROOT}/{rel}"
         await vm.files.write(dest, path.read_bytes())
+
+
+async def reset_claim_files(vm: Any) -> None:
+    """Rewrite pending claim JSON so a CDP miss (or hit) cannot poison the snapshot."""
+    data = PORTAL_DIR / "data"
+    for src in sorted(data.glob("CLM-*.json")):
+        await vm.files.write(f"{GUEST_ROOT}/data/{src.name}", src.read_bytes())
 
 
 async def _start_server(vm: Any) -> None:
@@ -109,24 +118,23 @@ async def _wait_desktop_ready(desktop: Any) -> None:
         if getattr(health, "ready", False):
             return
         await asyncio.sleep(1)
+    raise RuntimeError("desktop.health() never reported ready (not GET /sessions/:id)")
 
 
 async def end_vm(vm: Any) -> None:
-    """kill(), not close(), ends the VM. close() only drops the local channel.
-
-    The desktop example also destroy()/close(); we call kill() which hits
-    DELETE /sandboxes/:id and then closes the channel. TypeScript's
-    solari.close() hang is N/A here; this is Python.
+    """kill() ends the VM. close() only drops the local channel and must not
+    be used as a fallback; that leaves the guest billed until idle timeout.
     """
     if vm is None:
         return
-    try:
-        await vm.kill()
-    except Exception:
+    last: Optional[BaseException] = None
+    for _ in range(2):
         try:
-            await vm.close()
-        except Exception:
-            pass
+            await vm.kill()
+            return
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+    sys.stderr.write(f"end_vm: kill failed ({type(last).__name__}); VM may still be billed\n")
 
 
 async def read_claim_file(vm: Any, claim_id: str) -> dict:
@@ -155,16 +163,18 @@ async def boot_original(sbx: Any) -> Host:
     handle = None
     kind = "desktop"
     try:
-        # record=True is legal on a golden desktop boot. Not on fromSnapshot.
+        # record=True is legal on a golden boot and 400 with fromSnapshot.
+        # Default off: recording is extra spend. Opt in with SOLARI_ARENA_REPLAY=1.
+        record = os.environ.get("SOLARI_ARENA_REPLAY") == "1"
         handle = await sbx.create_desktop(
             template="default",
             resolution=f"{VIEWPORT_W}x{VIEWPORT_H}",
             cpu=CPU,
             mem_mb=MEM_MB,
             timeout_ms=TIMEOUT_MS,
-            record=True,
+            **({"record": True} if record else {}),
         )
-        notes.append("desktop golden boot (record=true)")
+        notes.append("desktop golden boot" + (" (record=true)" if record else ""))
     except Exception as exc:
         abort = _map_create_error(exc)
         if abort:
@@ -271,10 +281,7 @@ async def release_then_fork(sbx: Any, host: Host, snap_id: str) -> Tuple[Host, s
         abort = _map_create_error(exc)
         if abort and release == "paused":
             host.notes.append("pause+fromSnapshot hit 429; kill-then-fromSnapshot")
-            try:
-                await original.kill()
-            except Exception:
-                pass
+            await end_vm(original)
             release = "killed-after-429"
             try:
                 fork = await _create_fork()
@@ -324,13 +331,7 @@ async def maybe_poll_browser_replay(solari: Any, session_id: str) -> Optional[in
     return None
 
 
-def claim_pair(task: Task) -> Tuple[str, str]:
-    return task.oracle.claim_id, task.side_oracle.claim_id
-
-
 def task_url(preview: str, task: Task, path: str = "/") -> str:
-    sep = "&" if "?" in preview else "?"
-    # preview is an origin; path is / or /worklist.html
     return f"{preview.rstrip('/')}{path}?{task.worklist_query()}"
 
 

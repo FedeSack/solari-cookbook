@@ -6,6 +6,7 @@ import json
 import socket
 from http.cookiejar import CookieJar
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 
@@ -53,6 +54,12 @@ def portal():
     httpd.shutdown()
     thread.join(timeout=2)
     _reset_claims()
+
+
+def test_get_claim_requires_auth(portal):
+    with pytest.raises(HTTPError) as exc:
+        urlopen(portal + "/api/claims/CLM-1001", timeout=3)
+    assert exc.value.code == 401
 
 
 def test_login_is_real_dom_and_required(portal):

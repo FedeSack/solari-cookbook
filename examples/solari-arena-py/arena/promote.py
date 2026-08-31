@@ -7,7 +7,7 @@ original. If they do, something leaked: FAIL_ORIGINAL_MUTATED, never promote.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Optional
+from typing import Any, Mapping, Optional
 
 from .oracle import score_oracle
 from .reasons import FAIL_ORIGINAL_MUTATED, PASS_ORACLE
