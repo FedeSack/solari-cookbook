@@ -44,6 +44,18 @@ def test_ood_shift_80_leaves_in_dist_click():
     assert classify_click(*in_dist.center, shifted, decoy_rect()) == "miss"
     # The shifted CTA still does not contain the canvas centre.
     assert canvas_center_misses_cta(shifted)
+    # Pinned numbers (keep worklist.js in sync): canvas 1280x656, pad 18, CTA 168x44.
+    assert in_dist.x == 1094 and in_dist.y == 594
+    assert shifted.x == 1014 and shifted.y == 514
+    assert in_dist.center == (1178, 616)
+    assert not shifted.contains(1178, 616)
+
+
+def test_canvas_center_is_not_any_corner_cta():
+    cx, cy = canvas_rect().center
+    for corner in ("top-left", "top-right", "bottom-left", "bottom-right"):
+        assert not cta_rect(corner, 0).contains(cx, cy)
+        assert not cta_rect(corner, 80).contains(cx, cy)
 
 
 def test_target_and_decoy_do_not_overlap():

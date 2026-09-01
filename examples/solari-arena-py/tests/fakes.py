@@ -144,10 +144,12 @@ class FakeSandboxClient:
         desktop_ok: bool = True,
         pause_then_fork_ok: bool = True,
         record_from_snapshot_ok: bool = False,
+        desktop_503_times: int = 0,
     ) -> None:
         self.desktop_ok = desktop_ok
         self.pause_then_fork_ok = pause_then_fork_ok
         self.record_from_snapshot_ok = record_from_snapshot_ok
+        self.desktop_503_times = desktop_503_times
         self.calls: List[tuple] = []
         self.live: List[FakeHandle] = []
         self.files: Dict[str, bytes] = {}
@@ -166,6 +168,9 @@ class FakeSandboxClient:
                 raise FakeGatewayError(400, "RecordingRequiresGoldenBoot", "record+fromSnapshot")
         if kwargs.get("from_snapshot") and not self.pause_then_fork_ok and self._original_still_live():
             raise FakeConcurrencyError()
+        if not kwargs.get("from_snapshot") and self.desktop_503_times > 0:
+            self.desktop_503_times -= 1
+            raise FakeNoCapacity()
         if not self.desktop_ok and not kwargs.get("from_snapshot"):
             raise FakePlanError()
         return self._next("desktop")

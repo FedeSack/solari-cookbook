@@ -1,4 +1,9 @@
-"""FILE / HTTP oracle. The claim JSON is the ground truth, not an LLM."""
+"""FILE oracle. The claim JSON on the guest is the ground truth, not an LLM.
+
+HTTP was dropped from the schema: GET /api/claims/ needs a session cookie
+and the runner never sends one. The clinic still has those routes; the
+eval reads /tmp/clinic/data/CLM-*.json through files.read_text.
+"""
 
 from __future__ import annotations
 
@@ -11,13 +16,13 @@ from .reasons import FAIL_NO_MUTATION, FAIL_WRONG_CLAIM, PASS_ORACLE
 
 @dataclass(frozen=True)
 class OracleSpec:
-    type: str  # "file" | "http"
+    type: str  # "file" only
     path: str
     claim_id: str
 
     def __post_init__(self) -> None:
-        if self.type not in ("file", "http"):
-            raise ValueError(f"oracle.type must be file|http, got {self.type!r}")
+        if self.type != "file":
+            raise ValueError(f"oracle.type must be file, got {self.type!r}")
         if not self.path:
             raise ValueError("oracle.path is required")
         if not self.claim_id:

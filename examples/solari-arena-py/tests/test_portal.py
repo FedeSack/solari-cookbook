@@ -1,4 +1,4 @@
-"""Local portal + FILE/HTTP oracle. Still no Solari key."""
+"""Local portal. Claim JSON on disk is the oracle. Still no Solari key."""
 
 from __future__ import annotations
 

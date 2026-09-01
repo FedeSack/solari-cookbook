@@ -2,12 +2,32 @@
 
 OSWorld-style eval of a canvas-painted clinic worklist. CDP locators miss a
 corner CTA (no named AX node; Playwright clicks the canvas centre). Screenshot
-vision and desktop mouse can hit the same control. A FILE or HTTP oracle
+vision and desktop mouse can hit the same control. A FILE oracle on the guest
 scores the right claim vs a side-effect on the other one.
 
 The portal is written onto the VM at runtime (`files.write`, a stdlib HTTP
 server, a preview URL), same pattern as `sandbox-port-preview-ts`. Watermarked
 SYNTHETIC. No PHI, no real payers.
+
+## Research note
+
+Question: do CDP locators fail on a worklist whose Process control is paint
+in a corner, while a screenshot-centroid and a desktop mouse can finish the
+same goal, scored by claim JSON rather than an LLM?
+
+Method: three policies, serial, on the real products. CDP on the original VM.
+Vision and desktop on a snapshot-fork (Free is 1 concurrent VM). Promote a
+write only if the target claim JSON moved, the decoy did not, and a paused
+original still matches its baseline.
+
+What would change our mind: CDP processes CLM-1001 without `force=True`, or
+vision clicks a recoloured CTA, or a fork write shows up on the paused
+original.
+
+This is not a leaderboard. Dual scores (`success`, `side_effect_clean`) plus
+a reason code. Pixel vision is a colour-blob centroid of `#E85D04`. Recolour
+the button and the table prints `HALT_ILLEGIBLE`. That fixture lives in
+`arena/recolor.py` and is printed by `--dry-run`.
 
 ## Hypothesis
 
@@ -45,7 +65,8 @@ inspectable. If that 429s, kill and `fromSnapshot`. If desktop create returns
    untouched, and the paused original still matches its baseline. Otherwise
    `FAIL_WRONG_CLAIM`, `FAIL_NO_MUTATION`, or `FAIL_ORIGINAL_MUTATED`.
 8. OOD: same task, CTA shifted 80px toward the canvas centre. A cached in-dist
-   click is `FAIL_OOD_SHIFT`. An illegible frame is `HALT_ILLEGIBLE` (no click).
+   click is `FAIL_OOD_SHIFT`. An illegible or recoloured frame is
+   `HALT_ILLEGIBLE` (no click).
 
 Dual scores, printed per policy:
 
@@ -67,24 +88,37 @@ Reason codes: `PASS_ORACLE`, `FAIL_WRONG_CLAIM`, `FAIL_NO_MUTATION`,
 - Desktop is a paid entitlement. A 402 here means sandbox + browsers, not a
   fake GUI.
 - Pixel vision is a colour-blob centroid. Recolour the CTA and it misses, the
-  same way a locator misses a renamed button.
-- Preview URLs are public. Claim JSON is file-oracle on the guest; GET
-  `/api/claims/` requires the session cookie. The login page and synthetic PDF
-  stay reachable.
+  same way a locator misses a renamed button. See `--dry-run` for the fixture
+  table.
+- Preview URLs are public. Claim JSON is a file oracle on the guest. GET
+  `/api/claims/` still requires the session cookie; the eval does not use that
+  route. The login page and synthetic PDF stay reachable.
+- Dry-run cost figures are a ceiling from published Free rates
+  (`docs.getsolari.com/pricing`, copied 2026-09-01). They are not a live quote.
 - The TypeScript `solari.close()` hang does not apply; this is Python.
 
 ## Run
 
+Keyless, no API:
+
 ```bash
 cd examples/solari-arena-py
 pip install -r requirements.txt
-pytest                       # no key: skips live, unit tests still pass
-export SOLARI_API_KEY=slr_live_...   # https://console.getsolari.com
-python main.py                # shortest serial; prints the reason-code table
+pytest                       # unit tests; live skipped
+python main.py --dry-run     # serial schedule + cost ceiling + recolor table
+python main.py               # inconclusive without a key (exit 0)
 ```
 
-Without a key, `main.py` prints `inconclusive` and does not call the API. The
-GitHub Action runs `pytest` with `SOLARI_API_KEY` empty. Never print or commit
-the key.
+One live shot, later, when a key is in the env. Shortest serial only
+(in-dist task). pytest will not take this path unless you also set
+`SOLARI_ARENA_LIVE=1`. CI sets `SOLARI_API_KEY` empty.
+
+```bash
+export SOLARI_API_KEY=slr_live_...   # https://console.getsolari.com
+python main.py                       # spends: 1 VM + browsers, no record
+```
+
+`SOLARI_ARENA_REPLAY=1` turns on desktop `record` (golden boot only) and
+browser `recording`. Leave it unset. Never print or commit the key.
 
 Source: [`main.py`](main.py), [`arena/`](arena/), [`portal/`](portal/), [`tasks/`](tasks/).

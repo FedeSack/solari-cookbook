@@ -44,6 +44,20 @@ def test_refuse_no_mutation():
     assert not d.promote and d.reason == FAIL_NO_MUTATION
 
 
+def test_refuse_if_original_side_leaked():
+    d = promote_iff(
+        target_before=PENDING,
+        target_after=DONE,
+        side_before=SIDE_P,
+        side_after=SIDE_P,
+        original_target=PENDING,
+        original_side=SIDE_D,
+        baseline_target=PENDING,
+        baseline_side=SIDE_P,
+    )
+    assert not d.promote and d.reason == FAIL_ORIGINAL_MUTATED
+
+
 def test_refuse_if_original_leaked():
     d = promote_iff(
         target_before=PENDING,

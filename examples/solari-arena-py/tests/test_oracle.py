@@ -22,15 +22,19 @@ SIDE_P = {"claimId": "CLM-1002", "status": "pending", "watermark": "SYNTHETIC"}
 SIDE_D = {"claimId": "CLM-1002", "status": "processed", "watermark": "SYNTHETIC"}
 
 
-def test_parse_file_and_http():
+def test_parse_file_oracle():
     file_spec = parse_oracle({"type": "file", "path": "/tmp/clinic/data/CLM-1001.json", "claimId": "CLM-1001"})
-    http_spec = parse_oracle({"type": "http", "path": "/api/claims/CLM-1002", "claimId": "CLM-1002"})
     assert file_spec == OracleSpec("file", "/tmp/clinic/data/CLM-1001.json", "CLM-1001")
-    assert http_spec.type == "http"
+
+
+def test_parse_rejects_http_type():
+    # HTTP was dropped: GET /api/claims/ needs a cookie the runner does not send.
+    with pytest.raises(ValueError, match="must be file"):
+        parse_oracle({"type": "http", "path": "/api/claims/CLM-1002", "claimId": "CLM-1002"})
 
 
 def test_parse_rejects_unknown_type():
-    with pytest.raises(ValueError, match="file|http"):
+    with pytest.raises(ValueError, match="must be file"):
         parse_oracle({"type": "llm", "path": "/x", "claimId": "CLM-1001"})
 
 

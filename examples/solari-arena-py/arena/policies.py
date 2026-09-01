@@ -126,7 +126,7 @@ async def policy_cdp(browser: Any, host: Host, task: Task) -> PolicyResult:
         except Exception:
             clicked = False
         # After a CDP miss the useful next-policy hint is the centre click,
-        # not "SoM missing" — we already observed that by counting named
+        # not "SoM missing": we already observed that by counting named
         # Process controls. FAIL_SOM_NO_DOM is a note, not a second verdict.
         hint = FAIL_CANVAS_CLICK_MISS
         await asyncio.sleep(0.8)

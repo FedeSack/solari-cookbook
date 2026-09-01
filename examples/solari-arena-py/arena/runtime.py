@@ -142,18 +142,11 @@ async def read_claim_file(vm: Any, claim_id: str) -> dict:
     return parse_claim_json(text)
 
 
-async def read_claim_http(preview: str, spec_path: str) -> dict:
-    if spec_path.startswith("http"):
-        url = spec_path
-    else:
-        url = preview.rstrip("/") + "/" + spec_path.lstrip("/")
-    with urlopen(url, timeout=5) as resp:  # noqa: S310
-        return parse_claim_json(resp.read().decode("utf-8"))
-
-
 async def read_oracle(vm: Any, preview: str, spec) -> dict:
-    if spec.type == "http":
-        return await read_claim_http(preview, spec.path)
+    # preview is unused: oracles are files on the guest, not preview HTTP.
+    del preview
+    if getattr(spec, "type", "file") != "file":
+        raise ValueError(f"oracle.type must be file, got {spec.type!r}")
     return await read_claim_file(vm, spec.claim_id)
 
 
