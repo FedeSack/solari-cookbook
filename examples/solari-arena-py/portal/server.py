@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Synthetic clinic portal.
 
-`python -m http.server` is GET-only. The FILE/HTTP oracle needs POST to
-mutate claim JSON, so this is the stdlib server plus two routes. Same
+`python -m http.server` is GET-only. The worklist POSTs to mutate claim
+JSON, so this is the stdlib server plus login and /api/claims/. Same
 hosting pattern as sandbox-port-preview: write files, bind a port, mint
-a preview URL.
+a preview URL. The eval oracle reads the files; it does not GET /api.
 """
 
 from __future__ import annotations

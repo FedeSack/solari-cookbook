@@ -2,7 +2,7 @@
 
 CDP locators miss a canvas-painted corner CTA (no named AX; Playwright
 clicks the canvas centre). Screenshot vision and desktop mouse can hit it.
-A FILE/HTTP oracle scores the right claim vs a side-effect on the other.
+A FILE oracle scores the right claim vs a side-effect on the other.
 
 Free plan = 3 browsers + 1 VM, so policies run serial. Vision runs on a
 snapshot-fork; pause or kill the original first. record:true cannot combine
@@ -162,7 +162,7 @@ async def run_live(*, shortest: bool = True) -> int:
     key = api_key()
     if not key:
         print("inconclusive: SOLARI_API_KEY is not set; live serial skipped")
-        print("keyless tests: pytest")
+        print("keyless: pytest   or   python main.py --dry-run")
         return 0
 
     # pytest must not create VMs unless someone opted in. A leftover key in
@@ -264,7 +264,20 @@ async def run_live(*, shortest: bool = True) -> int:
             await sbx.aclose()
 
 
+def dry_run() -> int:
+    """Print the one-shot serial and a Free-plan cost ceiling. No API."""
+    from arena.recolor import format_recolor_table
+    from arena.schedule import format_dry_run
+
+    sys.stdout.write(format_dry_run())
+    sys.stdout.write("\n")
+    sys.stdout.write(format_recolor_table())
+    return 0
+
+
 def main() -> int:
+    if "--dry-run" in sys.argv:
+        return dry_run()
     if "--self-check" in sys.argv:
         from arena.geometry import canvas_center_misses_cta, ood_shift_misses_in_dist_click
 

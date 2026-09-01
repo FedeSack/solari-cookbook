@@ -37,7 +37,7 @@ past. Copy one into your project and change the parts you care about.
 
 | Example | Language | What it shows |
 | --- | --- | --- |
-| [solari-arena-py](examples/solari-arena-py) | Python | OSWorld-style canvas worklist: CDP vs vision vs desktop, file oracle |
+| [solari-arena-py](examples/solari-arena-py) | Python | OSWorld-style canvas worklist: CDP vs vision vs desktop, file oracle, dry-run |
 
 ## Running an example
 

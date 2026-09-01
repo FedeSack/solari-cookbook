@@ -48,6 +48,7 @@ def test_run_live_without_key_is_inconclusive(capsys):
     assert code == 0
     out = capsys.readouterr().out
     assert "inconclusive" in out
+    assert "--dry-run" in out
     assert "slr_live_" not in out
 
 
@@ -326,3 +327,21 @@ def test_playwright_preview_refuses_stream_url():
     with pytest.raises(RuntimeError, match=ABORT_STREAM_NOT_PLAYWRIGHT):
         refuse_playwright_preview("wss://api.getsolari.com/stream/vm1")
     refuse_playwright_preview("http://127.0.0.1:8765/")
+
+
+def test_503_retries_then_desktop_ok():
+    sbx = FakeSandboxClient(desktop_503_times=1)
+    host = asyncio.run(boot_original(sbx))
+    assert host.kind == "desktop"
+    assert any("503" in n for n in host.notes)
+    creates = [c for c in sbx.calls if c[0] == "create_desktop"]
+    assert len(creates) == 2
+    assert "record" not in creates[1][1]
+
+
+def test_503_then_still_unavailable_falls_back_to_sandbox():
+    sbx = FakeSandboxClient(desktop_503_times=2)
+    host = asyncio.run(boot_original(sbx))
+    assert host.kind == "sandbox"
+    assert any(c[0] == "create" for c in sbx.calls)
+    assert not any(c[0] == "close" for c in sbx.calls)
